@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cloud Image Notepad (GitHub Storage)</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; padding: 20px; background: #0b0c10; color: #e8e8e8; }
+    h1 { margin: 0 0 12px; font-size: 20px; }
+    .grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
+    @media (min-width: 980px) { .grid { grid-template-columns: 420px 1fr; } }
+    .card { background: #12141a; border: 1px solid #22262f; border-radius: 12px; padding: 14px; }
+    label { display: block; font-size: 12px; opacity: .9; margin: 10px 0 6px; }
+    input, textarea, button {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #2a3140;
+      background: #0f1218;
+      color: #e8e8e8;
+      border-radius: 10px;
+      padding: 10px;
+      outline: none;
+    }
+    textarea { min-height: 160px; resize: vertical; }
+    button { cursor: pointer; font-weight: 600; }
+    button.secondary { background: #101725; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .row { display: grid; gap: 10px; grid-template-columns: 1fr; }
+    @media (min-width: 560px) { .row.two { grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 760px) { .row.three { grid-template-columns: 1fr 1fr 1fr; } }
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #2a3140;
+      background: #0f1218;
+      font-size: 13px;
+      line-height: 1.3;
+      white-space: pre-wrap;
+    }
+    .status.ok { border-color: #1f7a3b; }
+    .status.err { border-color: #8b2b2b; }
+    .muted { font-size: 12px; opacity: .8; line-height: 1.35; }
+    .images {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      margin-top: 12px;
+    }
+    .imgItem {
+      border: 1px solid #22262f;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #0f1218;
+      display: flex;
+      flex-direction: column;
+    }
+    .imgThumb {
+      height: 110px;
+      background: #0b0c10;
+      display: grid;
+      place-items: center;
+    }
+    .imgThumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .imgMeta { padding: 8px; font-size: 12px; display: grid; gap: 6px; }
+    .imgMeta code { font-size: 11px; opacity: .9; }
+    .imgMeta button { padding: 8px; }
+    .viewer {
+      border: 1px dashed #2a3140;
+      border-radius: 12px;
+      padding: 10px;
+      margin-top: 12px;
+      min-height: 220px;
+      display: grid;
+      place-items: center;
+      background: #0f1218;
+    }
+    .viewer img { max-width: 100%; max-height: 520px; border-radius: 10px; }
+    .pill { display: inline-block; padding: 4px 8px; border: 1px solid #2a3140; border-radius: 999px; font-size: 12px; opacity: .85; }
+    hr { border: none; border-top: 1px solid #22262f; margin: 14px 0; }
+  </style>
+</head>
+
+<body>
+  <h1>Cloud Image Notepad <span class="pill">GitHub as storage</span></h1>
+
+  <div class="grid">
+    <!-- LEFT: CONFIG + NOTEPAD -->
+    <div class="card">
+      <h2 style="margin:0 0 10px; font-size:16px;">1) Configure GitHub</h2>
+
+      <div class="row two">
+        <div>
+          <label>Owner (username/org)</label>
+          <input id="owner" placeholder="e.g. myusername" />
+        </div>
+        <div>
+          <label>Repository</label>
+          <input id="repo" placeholder="e.g. cloud-image-notepad" />
+        </div>
+      </div>
+
+      <div class="row three">
+        <div>
+          <label>Branch</label>
+          <input id="branch" placeholder="main" value="main" />
+        </div>
+        <div>
+          <label>Images folder path</label>
+          <input id="imgFolder" placeholder="cloud-images" value="cloud-images" />
+        </div>
+        <div>
+          <label>Notes folder path</label>
+          <input id="notesFolder" placeholder="notes" value="notes" />
+        </div>
+      </div>
+
+      <label>GitHub Token (Fine-grained PAT; Contents: Read+Write; expires ≥ 90 days)</label>
+      <input id="token" placeholder="github_pat_..." type="password" />
+
+      <div class="row two" style="margin-top:10px;">
+        <button id="saveCfgBtn">Save Config</button>
+        <button id="clearCfgBtn" class="secondary">Clear Config</button>
+      </div>
+
+      <p class="muted" style="margin:10px 0 0;">
+        Note: Token is stored in <b>session storage</b> (clears when you close the tab).
+        Repo info is stored in <b>local storage</b>.
+      </p>
+
+      <hr>
+
+      <h2 style="margin:0 0 10px; font-size:16px;">2) Notepad (GitHub file)</h2>
+
+      <div class="row two">
+        <div>
+          <label>File name</label>
+          <input id="noteFileName" placeholder="note.txt" value="note.txt" />
+        </div>
+        <div>
+          <label>Full path preview</label>
+          <input id="noteFullPath" readonly />
+        </div>
+      </div>
+
+      <label>Text content</label>
+      <textarea id="noteText" placeholder="Type notes here..."></textarea>
+
+      <div class="row two" style="margin-top:10px;">
+        <button id="loadNoteBtn" class="secondary">Load Text File</button>
+        <button id="saveNoteBtn">Save Text File</button>
+      </div>
+
+      <div id="status" class="status" aria-live="polite">Status messages will appear here.</div>
+    </div>
+
+    <!-- RIGHT: IMAGE LIST + VIEWER -->
+    <div class="card">
+      <h2 style="margin:0 0 10px; font-size:16px;">3) Image Viewer (Cloud Folder)</h2>
+
+      <div class="row two">
+        <button id="refreshBtn" class="secondary">Refresh List</button>
+        <button id="addImageBtn">Add Image</button>
+      </div>
+
+      <div style="margin-top:10px;" class="row two">
+        <div>
+          <label>Select image file</label>
+          <input id="imageFile" type="file" accept="image/*" />
+        </div>
+        <div>
+          <label>Save as file name (optional)</label>
+          <input id="imageSaveName" placeholder="e.g. myphoto.png (leave blank to use original)" />
+        </div>
+      </div>
+
+      <p class="muted" style="margin:10px 0 0;">
+        Images are stored in: <code id="imgFolderPreview"></code>
+      </p>
+
+      <div class="viewer" id="viewer">
+        <div class="muted" style="text-align:center;">
+          Select an image from the list (or add one) to preview it here.
+        </div>
+      </div>
+
+      <div id="images" class="images"></div>
+    </div>
+  </div>
+
+<script>
+/** ========== Helpers ========== */
+const $ = (id) => document.getElementById(id);
+
+function setStatus(message, ok = true) {
+  const el = $("status");
+  el.textContent = message;
+  el.classList.remove("ok", "err");
+  el.classList.add(ok ? "ok" : "err");
+}
+
+function requireConfig(cfg) {
+  const missing = [];
+  if (!cfg.owner) missing.push("Owner");
+  if (!cfg.repo) missing.push("Repo");
+  if (!cfg.branch) missing.push("Branch");
+  if (!cfg.token) missing.push("Token");
+  if (!cfg.imgFolder) missing.push("Images folder");
+  if (!cfg.notesFolder) missing.push("Notes folder");
+  if (missing.length) throw new Error("Missing config: " + missing.join(", "));
+}
+
+function normalizeFolderPath(p) {
+  if (!p) return "";
+  return p.replace(/^\/+/, "").replace(/\/+$/, "");
+}
+
+function joinPath(...parts) {
+  return parts
+    .filter(Boolean)
+    .map(p => p.replace(/^\/+/, "").replace(/\/+$/, ""))
+    .join("/");
+}
+
+function b64EncodeUnicode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin);
+}
+
+function b64DecodeUnicode(b64) {
+  const bin = atob(b64);
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read file."));
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      const idx = dataUrl.indexOf("base64,");
+      if (idx === -1) return reject(new Error("Unexpected file encoding."));
+      resolve(dataUrl.slice(idx + "base64,".length));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/** ========== GitHub API ========== */
+function githubHeaders(token) {
+  return {
+    "Accept": "application/vnd.github+json",
+    "Authorization": `Bearer ${token}`,
+    "X-GitHub-Api-Version": "2022-11-28"
+  };
+}
+
+function contentsUrl(cfg, path) {
+  const p = path.replace(/^\/+/, "");
+  return `https://api.github.com/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/contents/${p}`;
+}
+
+async function ghGetContents(cfg, path) {
+  const url = contentsUrl(cfg, path) + `?ref=${encodeURIComponent(cfg.branch)}`;
+  const res = await fetch(url, { headers: githubHeaders(cfg.token) });
+  if (res.status === 404) return { ok: false, status: 404, data: null };
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+async function ghPutFile(cfg, path, base64Content, message) {
+  const existing = await ghGetContents(cfg, path);
+  let sha = undefined;
+  if (existing.ok && existing.data && existing.data.sha) sha = existing.data.sha;
+
+  const body = {
+    message: message || `Update ${path}`,
+    content: base64Content,
+    branch: cfg.branch,
+    ...(sha ? { sha } : {})
+  };
+
+  const res = await fetch(contentsUrl(cfg, path), {
+    method: "PUT",
+    headers: { ...githubHeaders(cfg.token), "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.message ? `GitHub error: ${data.message}` : `GitHub error: HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+/** ========== Config Storage ========== */
+function getConfigFromUI() {
+  return {
+    owner: $("owner").value.trim(),
+    repo: $("repo").value.trim(),
+    branch: $("branch").value.trim() || "main",
+    imgFolder: normalizeFolderPath($("imgFolder").value.trim()),
+    notesFolder: normalizeFolderPath($("notesFolder").value.trim()),
+    token: $("token").value.trim()
+  };
+}
+
+function setUIFromConfig(cfg) {
+  $("owner").value = cfg.owner || "";
+  $("repo").value = cfg.repo || "";
+  $("branch").value = cfg.branch || "main";
+  $("imgFolder").value = cfg.imgFolder || "cloud-images";
+  $("notesFolder").value = cfg.notesFolder || "notes";
+  $("token").value = cfg.token || "";
+  updatePreviews();
+}
+
+function updatePreviews() {
+  const cfg = getConfigFromUI();
+  $("imgFolderPreview").textContent = joinPath(cfg.imgFolder) || "(not set)";
+  const notePath = joinPath(cfg.notesFolder, $("noteFileName").value.trim() || "note.txt");
+  $("noteFullPath").value = notePath;
+}
+
+function saveConfig() {
+  const cfg = getConfigFromUI();
+  localStorage.setItem("cloudNotepadCfg", JSON.stringify({
+    owner: cfg.owner, repo: cfg.repo, branch: cfg.branch,
+    imgFolder: cfg.imgFolder, notesFolder: cfg.notesFolder
+  }));
+  sessionStorage.setItem("cloudNotepadToken", cfg.token);
+  setStatus("Config saved.\nToken stored in session storage (clears when you close the tab).", true);
+}
+
+function loadConfig() {
+  const raw = localStorage.getItem("cloudNotepadCfg");
+  const token = sessionStorage.getItem("cloudNotepadToken") || "";
+  const base = raw ? JSON.parse(raw) : {};
+  setUIFromConfig({ ...base, token });
+}
+
+function clearConfig() {
+  localStorage.removeItem("cloudNotepadCfg");
+  sessionStorage.removeItem("cloudNotepadToken");
+  setUIFromConfig({ owner:"", repo:"", branch:"main", imgFolder:"cloud-images", notesFolder:"notes", token:"" });
+  setStatus("Config cleared.", true);
+}
+
+/** ========== Notepad (text file) ========== */
+async function loadNoteFile() {
+  try {
+    const cfg = getConfigFromUI();
+    requireConfig(cfg);
+
+    const noteName = $("noteFileName").value.trim() || "note.txt";
+    const path = joinPath(cfg.notesFolder, noteName);
+    updatePreviews();
+
+    setStatus(`Loading text file: ${path} ...`, true);
+    const res = await ghGetContents(cfg, path);
+
+    if (res.status === 404) {
+      $("noteText").value = "";
+      setStatus(`Text file not found: ${path}\nYou can create it by clicking "Save Text File".`, false);
+      return;
+    }
+    if (!res.ok) throw new Error(res.data?.message || `Failed to load. HTTP ${res.status}`);
+
+    const b64 = String(res.data.content || "").replace(/\n/g, "");
+    $("noteText").value = b64DecodeUnicode(b64);
+    setStatus(`Loaded text file successfully: ${path}`, true);
+  } catch (e) {
+    setStatus(`Load failed: ${e.message}\nCheck token permissions, repo info, branch, and network.`, false);
+  }
+}
+
+async function saveNoteFile() {
+  try {
+    const cfg = getConfigFromUI();
+    requireConfig(cfg);
+
+    const noteName = $("noteFileName").value.trim() || "note.txt";
+    const path = joinPath(cfg.notesFolder, noteName);
+    updatePreviews();
+
+    const text = $("noteText").value ?? "";
+    const b64 = b64EncodeUnicode(text);
+
+    setStatus(`Saving text file: ${path} ...`, true);
+    await ghPutFile(cfg, path, b64, `Save note: ${path}`);
+    setStatus(`Saved text file successfully: ${path}`, true);
+  } catch (e) {
+    setStatus(`Save failed: ${e.message}\nCheck token permissions and network.`, false);
+  }
+}
+
+/** ========== Images (list/add/view) ========== */
+function isImageName(name) {
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+}
+
+function guessMimeType(name) {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".bmp")) return "image/bmp";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  return "application/octet-stream";
+}
+
+async function refreshImageList() {
+  try {
+    const cfg = getConfigFromUI();
+    requireConfig(cfg);
+
+    const folder = cfg.imgFolder;
+    setStatus(`Refreshing image list from: ${folder} ...`, true);
+
+    const res = await ghGetContents(cfg, folder);
+    if (res.status === 404) {
+      $("images").innerHTML = "";
+      setStatus(`Folder not found: ${folder}\nCreate this folder in your repo first (e.g., add cloud-images/.keep).`, false);
+      return;
+    }
+    if (!res.ok) throw new Error(res.data?.message || `Failed to list folder. HTTP ${res.status}`);
+
+    const items = Array.isArray(res.data) ? res.data : [];
+    const files = items
+      .filter(x => x.type === "file" && isImageName(x.name))
+      .sort((a,b) => a.name.localeCompare(b.name));
+
+    renderImageList(files);
+    setStatus(`Loaded ${files.length} image(s) from: ${folder}`, true);
+  } catch (e) {
+    setStatus(`Refresh failed: ${e.message}`, false);
+  }
+}
+
+function renderImageList(files) {
+  const container = $("images");
+  container.innerHTML = "";
+
+  if (!files.length) {
+    container.innerHTML = `<div class="muted">No images found in this folder.</div>`;
+    return;
+  }
+
+  for (const f of files) {
+    const card = document.createElement("div");
+    card.className = "imgItem";
+
+    const thumb = document.createElement("div");
+    thumb.className = "imgThumb";
+
+    const img = document.createElement("img");
+    const cfg = getConfigFromUI();
+    const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/${encodeURIComponent(cfg.branch)}/${f.path}`;
+    img.src = rawUrl;
+    img.alt = f.name;
+    img.onerror = () => { thumb.textContent = "Preview on demand"; };
+    thumb.appendChild(img);
+
+    const meta = document.createElement("div");
+    meta.className = "imgMeta";
+    meta.innerHTML = `
+      <div title="${f.path}"><b>${f.name}</b></div>
+      <code>${f.path}</code>
+    `;
+
+    const btn = document.createElement("button");
+    btn.textContent = "View (Load from API)";
+    btn.className = "secondary";
+    btn.onclick = () => loadAndViewImage(f.path, f.name);
+
+    meta.appendChild(btn);
+    card.appendChild(thumb);
+    card.appendChild(meta);
+    container.appendChild(card);
+  }
+}
+
+async function loadAndViewImage(path, name) {
+  try {
+    const cfg = getConfigFromUI();
+    requireConfig(cfg);
+
+    setStatus(`Loading image: ${path} ...`, true);
+    const res = await ghGetContents(cfg, path);
+
+    if (res.status === 404) throw new Error("Image not found (404).");
+    if (!res.ok) throw new Error(res.data?.message || `Failed to load image. HTTP ${res.status}`);
+
+    const b64 = String(res.data.content || "").replace(/\n/g, "");
+    const mime = guessMimeType(name);
+    const dataUrl = `data:${mime};base64,${b64}`;
+
+    const viewer = $("viewer");
+    viewer.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = dataUrl;
+    img.alt = name;
+    viewer.appendChild(img);
+
+    setStatus(`Image loaded: ${name}`, true);
+  } catch (e) {
+    setStatus(`View failed: ${e.message}`, false);
+  }
+}
+
+async function addImage() {
+  try {
+    const cfg = getConfigFromUI();
+    requireConfig(cfg);
+
+    const file = $("imageFile").files?.[0];
+    if (!file) throw new Error("Please choose an image file first.");
+
+    const desiredName = $("imageSaveName").value.trim();
+    const saveName = desiredName || file.name;
+
+    if (!isImageName(saveName)) {
+      throw new Error("File name must end with an image extension (png/jpg/gif/webp/etc).");
+    }
+
+    const path = joinPath(cfg.imgFolder, saveName);
+
+    setStatus(`Uploading image: ${saveName}\nTarget path: ${path}\nReading file...`, true);
+    const b64 = await fileToBase64(file);
+
+    setStatus(`Uploading to GitHub (create/overwrite): ${path} ...`, true);
+    await ghPutFile(cfg, path, b64, `Upload image: ${path}`);
+
+    setStatus(`Upload successful: ${saveName}\nRefreshing list...`, true);
+    $("imageFile").value = "";
+    $("imageSaveName").value = "";
+    await refreshImageList();
+  } catch (e) {
+    setStatus(`Add Image failed: ${e.message}\nCommon causes: invalid token, missing folder, branch mismatch, network issues.`, false);
+  }
+}
+
+/** ========== UI wiring ========== */
+$("saveCfgBtn").addEventListener("click", saveConfig);
+$("clearCfgBtn").addEventListener("click", clearConfig);
+
+["noteFileName","imgFolder","notesFolder","owner","repo","branch"].forEach(id => {
+  $(id).addEventListener("input", updatePreviews);
+});
+
+$("loadNoteBtn").addEventListener("click", loadNoteFile);
+$("saveNoteBtn").addEventListener("click", saveNoteFile);
+
+$("refreshBtn").addEventListener("click", refreshImageList);
+$("addImageBtn").addEventListener("click", addImage);
+
+// Initial
+loadConfig();
+updatePreviews();
+</script>
+</body>
+</html>
